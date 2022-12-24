@@ -5,10 +5,10 @@ import sys
 import os
 
 cnx = None
-print(sys.path[0])
 try:
     cfile = configparser.ConfigParser()
     cfile.read(os.path.join(sys.path[0], "api/config.ini"))
+    # if you are running it in development environment, remove "api/"
 
     cnx = sql.connect(host=cfile["DATABASE"]["DB_HOST"],
                       user=cfile["DATABASE"]["DB_USER"],
