@@ -1,12 +1,14 @@
 from flask import Flask
 import mysql.connector as sql
 import configparser
-
+import sys
+import os
 
 cnx = None
+print(sys.path[0])
 try:
     cfile = configparser.ConfigParser()
-    cfile.read("config.ini")
+    cfile.read(os.path.join(sys.path[0], "api/config.ini"))
 
     cnx = sql.connect(host=cfile["DATABASE"]["DB_HOST"],
                       user=cfile["DATABASE"]["DB_USER"],
