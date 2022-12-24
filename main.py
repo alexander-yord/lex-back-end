@@ -1,4 +1,26 @@
 from flask import Flask
+import mysql.connector as sql
+import configparser
+
+
+cnx = None
+try:
+    cfile = configparser.ConfigParser()
+    cfile.read("config.ini")
+
+    cnx = sql.connect(host=cfile["DATABASE"]["DB_HOST"],
+                      user=cfile["DATABASE"]["DB_USER"],
+                      password=cfile["DATABASE"]["DB_PASS"],
+                      database=cfile["DATABASE"]["DB_NAME"])
+except FileNotFoundError as error:
+    print("File was not found: ", error)
+    raise FileNotFoundError
+except sql.Error as err:
+    if err.errno == sql.errorcode.ER_ACCESS_DENIED_ERROR:
+        print("User authorization error")
+    elif err.errno == sql.errorcode.ER_BAD_DB_ERROR:
+        print("Database doesn't exist")
+    raise err
 
 app = Flask(__name__)
 
@@ -8,8 +30,6 @@ def index():
     return "Welcome to the home page"
 
 
-# Press the green button in the gutter to run the script.
 if __name__ == '__main__':
     app.run()
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
