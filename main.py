@@ -4,27 +4,51 @@ import configparser
 import sys
 import os
 
-# database connection variable
-cnx = None
-# tries to connect to the database
-try:
-    cfile = configparser.ConfigParser()  # reads credentials from the config.ini file (git ignored)
-    cfile.read(os.path.join(sys.path[0], "api/config.ini"))
-    # if you are running it in development environment, remove "api/"
+"""Contents:
+definition of connect()
+definition of the renew_connection decorator
+definition of usernameIsUnique()
 
-    cnx = sql.connect(host=cfile["DATABASE"]["DB_HOST"],
-                      user=cfile["DATABASE"]["DB_USER"],
-                      password=cfile["DATABASE"]["DB_PASS"],
-                      database=cfile["DATABASE"]["DB_NAME"])
-except sql.Error as err:
-    if err.errno == sql.errorcode.ER_ACCESS_DENIED_ERROR:
-        print("User authorization error")
-    elif err.errno == sql.errorcode.ER_BAD_DB_ERROR:
-        print("Database doesn't exist")
-    raise err
+initialization of the db connection and the Flask app
 
-app = Flask(__name__)
-cursor = cnx.cursor()
+signup endpoint
+uniqueness endpoint
+login endpoint
+"""
+
+
+# function to connect to the database
+def connect():
+    global cnx, cursor  # allows us to change variables in the global scope
+    try:
+        cfile = configparser.ConfigParser()  # reads credentials from the config.ini file (git ignored)
+        cfile.read(os.path.join(sys.path[0], "api/config.ini"))
+        # if you are running it in development environment, remove "api/"
+
+        cnx = sql.connect(host=cfile["DATABASE"]["DB_HOST"],
+                          user=cfile["DATABASE"]["DB_USER"],
+                          password=cfile["DATABASE"]["DB_PASS"],
+                          database=cfile["DATABASE"]["DB_NAME"])
+    except sql.Error as err:
+        if err.errno == sql.errorcode.ER_ACCESS_DENIED_ERROR:
+            print("User authorization error")
+        elif err.errno == sql.errorcode.ER_BAD_DB_ERROR:
+            print("Database doesn't exist")
+        raise err
+    cursor = cnx.cursor()
+
+
+def renew_connection(func):
+    """Decorator to check if the connection to the database is still active
+    and renew it if not
+    """
+    def wrapper(*args, **kwargs):
+        try:
+            _ = cnx.cursor()  # meaningless statement to test the connection
+        except sql.Error:
+            connect()
+        func(*args, **kwargs)
+    return wrapper()
 
 
 def usernameIsUnique(username):
@@ -35,6 +59,14 @@ def usernameIsUnique(username):
     return True if cursor.rowcount == 0 else False
 
 
+# database connection variable
+cnx = None
+connect()  # tries to connect to the database
+
+app = Flask(__name__)
+
+
+@renew_connection
 @app.route("/signup", methods=["POST"])
 def signup():
     """Expects a POST request with the
@@ -87,6 +119,7 @@ def signup():
         return make_response(jsonify({"success": False}))
 
 
+@renew_connection
 @app.route("/uniqueness", methods=["POST"])
 def uniqueness():
     """Endpoint that checks whether the username is unique
@@ -94,6 +127,7 @@ def uniqueness():
     return make_response(jsonify({"unique": usernameIsUnique(request.json.get("username"))}))
 
 
+@renew_connection
 @app.route("/login", methods=["POST"])
 def login():
     """Endpoint that checks login credentials and if login is successful, returns
