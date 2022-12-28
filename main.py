@@ -6,8 +6,7 @@ import os
 
 """Contents:
 definition of connect()
-definition of the renew_connection decorator
-definition of usernameIsUnique()
+definition of username_is_unique()
 
 initialization of the db connection and the Flask app
 
@@ -23,7 +22,7 @@ def connect():
     try:
         cfile = configparser.ConfigParser()  # reads credentials from the config.ini file (git ignored)
         cfile.read(os.path.join(sys.path[0], "api/config.ini"))
-        # if you are running it in development environment, remove "api/"
+        # if you are running it in a local development environment, remove "api/"
 
         cnx = sql.connect(host=cfile["DATABASE"]["DB_HOST"],
                           user=cfile["DATABASE"]["DB_USER"],
@@ -38,21 +37,7 @@ def connect():
     cursor = cnx.cursor()
 
 
-"""
-def renew_connection(func):
-    ""Decorator to check if the connection to the database is still active
-    and renew it if not
-    ""
-    def wrapper(*args, **kwargs):
-        try:
-            _ = cnx.cursor()  # meaningless statement to test the connection
-        except sql.Error:
-            connect()
-        func(*args, **kwargs)
-    return wrapper()
-"""
-
-def usernameIsUnique(username):
+def username_is_unique(username):
     stmt = "SELECT account_id FROM accounts WHERE username = %s"
     usr_tuple = (username,)
     cursor.execute(stmt, usr_tuple)
@@ -60,10 +45,12 @@ def usernameIsUnique(username):
     return True if cursor.rowcount == 0 else False
 
 
-# database connection variable
-cnx = None
-connect()  # tries to connect to the database
+# database connection
+cnx = None  # database connection variable
+cursor = None  # cursor variable
+connect()  # connects to the database
 
+# Flask app
 app = Flask(__name__)
 
 
@@ -78,7 +65,7 @@ def signup():
     """
     try:  # tests the connection
         _ = cnx.cursor()  # meaningless statement to test the connection
-    except sql.Error: # if it is not working, it will reconnect
+    except sql.Error:  # if it is not working, it will reconnect
         connect()
 
     # gets the values from the POST request
@@ -88,7 +75,7 @@ def signup():
     password = request.json.get("password")
 
     # checks whether the username is unique
-    if usernameIsUnique(username):
+    if username_is_unique(username):
         # prepares and executes the sql stmt for the accounts table
         stmt = "INSERT INTO accounts (username, first_name, last_name, status) " \
                "VALUES (%s, %s, %s, 'C')"
@@ -130,9 +117,9 @@ def uniqueness():
     """
     try:  # tests the connection
         _ = cnx.cursor()  # meaningless statement to test the connection
-    except sql.Error: # if it is not working, it will reconnect
+    except sql.Error:  # if it is not working, it will reconnect
         connect()
-    return make_response(jsonify({"unique": usernameIsUnique(request.json.get("username"))}))
+    return make_response(jsonify({"unique": username_is_unique(request.json.get("username"))}))
 
 
 @app.route("/login", methods=["POST"])
@@ -146,7 +133,7 @@ def login():
 
     try:  # tests the connection
         _ = cnx.cursor()  # meaningless statement to test the connection
-    except sql.Error: # if it is not working, it will reconnect
+    except sql.Error:  # if it is not working, it will reconnect
         connect()
 
     # gets the username and password
@@ -154,7 +141,7 @@ def login():
     password = request.json.get("password")
 
     # checks if the username exists
-    if not usernameIsUnique(username): # returns False if it exists
+    if not username_is_unique(username): # returns False if it exists
         stmt = "SELECT a.account_id, a.username, a.first_name, a.last_name, l.password " \
                "FROM accounts a LEFT JOIN login_credentials l ON a.account_id = l.account_id " \
                "WHERE a.username = %s"
