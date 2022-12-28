@@ -4,35 +4,54 @@ import configparser
 import sys
 import os
 
-# database connection variable
-cnx = None
-# tries to connect to the database
-try:
-    cfile = configparser.ConfigParser()  # reads credentials from the config.ini file (git ignored)
-    cfile.read(os.path.join(sys.path[0], "api/config.ini"))
-    # if you are running it in development environment, remove "api/"
+"""Contents:
+definition of connect()
+definition of username_is_unique()
 
-    cnx = sql.connect(host=cfile["DATABASE"]["DB_HOST"],
-                      user=cfile["DATABASE"]["DB_USER"],
-                      password=cfile["DATABASE"]["DB_PASS"],
-                      database=cfile["DATABASE"]["DB_NAME"])
-except sql.Error as err:
-    if err.errno == sql.errorcode.ER_ACCESS_DENIED_ERROR:
-        print("User authorization error")
-    elif err.errno == sql.errorcode.ER_BAD_DB_ERROR:
-        print("Database doesn't exist")
-    raise err
+initialization of the db connection and the Flask app
 
-app = Flask(__name__)
-cursor = cnx.cursor()
+signup endpoint
+uniqueness endpoint
+login endpoint
+"""
 
 
-def usernameIsUnique(username):
+# function to connect to the database
+def connect():
+    global cnx, cursor  # allows us to change variables in the global scope
+    try:
+        cfile = configparser.ConfigParser()  # reads credentials from the config.ini file (git ignored)
+        cfile.read(os.path.join(sys.path[0], "api/config.ini"))
+        # if you are running it in a local development environment, remove "api/"
+
+        cnx = sql.connect(host=cfile["DATABASE"]["DB_HOST"],
+                          user=cfile["DATABASE"]["DB_USER"],
+                          password=cfile["DATABASE"]["DB_PASS"],
+                          database=cfile["DATABASE"]["DB_NAME"])
+    except sql.Error as err:
+        if err.errno == sql.errorcode.ER_ACCESS_DENIED_ERROR:
+            print("User authorization error")
+        elif err.errno == sql.errorcode.ER_BAD_DB_ERROR:
+            print("Database doesn't exist")
+        raise err
+    cursor = cnx.cursor()
+
+
+def username_is_unique(username):
     stmt = "SELECT account_id FROM accounts WHERE username = %s"
     usr_tuple = (username,)
     cursor.execute(stmt, usr_tuple)
     _ = cursor.fetchall()
     return True if cursor.rowcount == 0 else False
+
+
+# database connection
+cnx = None  # database connection variable
+cursor = None  # cursor variable
+connect()  # connects to the database
+
+# Flask app
+app = Flask(__name__)
 
 
 @app.route("/signup", methods=["POST"])
@@ -44,6 +63,11 @@ def signup():
     logged in.
     If not, returns {success = False}
     """
+    try:  # tests the connection
+        _ = cnx.cursor()  # meaningless statement to test the connection
+    except sql.Error:  # if it is not working, it will reconnect
+        connect()
+
     # gets the values from the POST request
     first_name = request.json.get("first_name")
     last_name = request.json.get("last_name")
@@ -51,7 +75,7 @@ def signup():
     password = request.json.get("password")
 
     # checks whether the username is unique
-    if usernameIsUnique(username):
+    if username_is_unique(username):
         # prepares and executes the sql stmt for the accounts table
         stmt = "INSERT INTO accounts (username, first_name, last_name, status) " \
                "VALUES (%s, %s, %s, 'C')"
@@ -91,7 +115,11 @@ def signup():
 def uniqueness():
     """Endpoint that checks whether the username is unique
     """
-    return make_response(jsonify({"unique": usernameIsUnique(request.json.get("username"))}))
+    try:  # tests the connection
+        _ = cnx.cursor()  # meaningless statement to test the connection
+    except sql.Error:  # if it is not working, it will reconnect
+        connect()
+    return make_response(jsonify({"unique": username_is_unique(request.json.get("username"))}))
 
 
 @app.route("/login", methods=["POST"])
@@ -103,12 +131,17 @@ def login():
     error_no = 2: password is incorrect
     """
 
+    try:  # tests the connection
+        _ = cnx.cursor()  # meaningless statement to test the connection
+    except sql.Error:  # if it is not working, it will reconnect
+        connect()
+
     # gets the username and password
     username = request.json.get("username")
     password = request.json.get("password")
 
     # checks if the username exists
-    if not usernameIsUnique(username): # returns False if it exists
+    if not username_is_unique(username): # returns False if it exists
         stmt = "SELECT a.account_id, a.username, a.first_name, a.last_name, l.password " \
                "FROM accounts a LEFT JOIN login_credentials l ON a.account_id = l.account_id " \
                "WHERE a.username = %s"
