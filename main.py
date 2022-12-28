@@ -38,11 +38,11 @@ def connect():
 
 
 def username_is_unique(username):
-    stmt = "SELECT account_id FROM accounts WHERE username = %s"
+    stmt = "SELECT count(account_id) FROM accounts WHERE username = %s"
     usr_tuple = (username,)
     cursor.execute(stmt, usr_tuple)
-    _ = cursor.fetchall()
-    return True if cursor.rowcount == 0 else False
+    count = cursor.fetchall()[0][0]  # gets the count
+    return True if count == 0 else False
 
 
 # database connection
