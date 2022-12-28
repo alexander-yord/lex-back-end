@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify, make_response, copy_current_request_context
 import mysql.connector as sql
 import configparser
 import sys
@@ -42,6 +42,7 @@ def renew_connection(func):
     """Decorator to check if the connection to the database is still active
     and renew it if not
     """
+    @copy_current_request_context
     def wrapper(*args, **kwargs):
         try:
             _ = cnx.cursor()  # meaningless statement to test the connection
