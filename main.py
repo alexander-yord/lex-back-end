@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, make_response, copy_current_request_context
+from flask import Flask, request, jsonify, make_response
 import mysql.connector as sql
 import configparser
 import sys
@@ -42,7 +42,6 @@ def renew_connection(func):
     """Decorator to check if the connection to the database is still active
     and renew it if not
     """
-    @copy_current_request_context
     def wrapper(*args, **kwargs):
         try:
             _ = cnx.cursor()  # meaningless statement to test the connection
@@ -67,7 +66,6 @@ connect()  # tries to connect to the database
 app = Flask(__name__)
 
 
-@renew_connection
 @app.route("/signup", methods=["POST"])
 def signup():
     """Expects a POST request with the
@@ -77,6 +75,10 @@ def signup():
     logged in.
     If not, returns {success = False}
     """
+    try:  # tests the connection
+        _ = cnx.cursor()  # meaningless statement to test the connection
+    except sql.Error: # if it is not working, it will reconnect
+        connect()
     # gets the values from the POST request
     first_name = request.json.get("first_name")
     last_name = request.json.get("last_name")
