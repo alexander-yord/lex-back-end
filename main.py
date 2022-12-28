@@ -38,10 +38,11 @@ def connect():
     cursor = cnx.cursor()
 
 
+"""
 def renew_connection(func):
-    """Decorator to check if the connection to the database is still active
+    ""Decorator to check if the connection to the database is still active
     and renew it if not
-    """
+    ""
     def wrapper(*args, **kwargs):
         try:
             _ = cnx.cursor()  # meaningless statement to test the connection
@@ -49,7 +50,7 @@ def renew_connection(func):
             connect()
         func(*args, **kwargs)
     return wrapper()
-
+"""
 
 def usernameIsUnique(username):
     stmt = "SELECT account_id FROM accounts WHERE username = %s"
@@ -134,7 +135,6 @@ def uniqueness():
     return make_response(jsonify({"unique": usernameIsUnique(request.json.get("username"))}))
 
 
-@renew_connection
 @app.route("/login", methods=["POST"])
 def login():
     """Endpoint that checks login credentials and if login is successful, returns
@@ -143,6 +143,11 @@ def login():
     error_no = 1: username does not exist
     error_no = 2: password is incorrect
     """
+
+    try:  # tests the connection
+        _ = cnx.cursor()  # meaningless statement to test the connection
+    except sql.Error: # if it is not working, it will reconnect
+        connect()
 
     # gets the username and password
     username = request.json.get("username")
