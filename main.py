@@ -79,6 +79,7 @@ def signup():
         _ = cnx.cursor()  # meaningless statement to test the connection
     except sql.Error: # if it is not working, it will reconnect
         connect()
+
     # gets the values from the POST request
     first_name = request.json.get("first_name")
     last_name = request.json.get("last_name")
@@ -122,11 +123,14 @@ def signup():
         return make_response(jsonify({"success": False}))
 
 
-@renew_connection
 @app.route("/uniqueness", methods=["POST"])
 def uniqueness():
     """Endpoint that checks whether the username is unique
     """
+    try:  # tests the connection
+        _ = cnx.cursor()  # meaningless statement to test the connection
+    except sql.Error: # if it is not working, it will reconnect
+        connect()
     return make_response(jsonify({"unique": usernameIsUnique(request.json.get("username"))}))
 
 
