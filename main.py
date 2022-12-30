@@ -188,7 +188,7 @@ def new():
     id_tuple = (account_id,)
     cursor.execute(stmt, id_tuple)
     if bool(cursor.fetchall()[0][0]):  # checks if this account_id exists
-        insert_stmt = "INSERT INTO lexes (content, account_id) VALUES (%s, %s)"
+        insert_stmt = "INSERT INTO lexes (content, account_id, status) VALUES (%s, %s, 'P')"
         lex_values = (content, account_id)
         cursor.execute(insert_stmt, lex_values)
         cnx.commit()
