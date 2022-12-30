@@ -48,7 +48,6 @@ def username_is_unique(username):
 
 # database connection
 cnx = None  # database connection variable
-cursor = cnx.cursor()  # cursor variable
 connect()  # connects to the database
 
 # Flask app
