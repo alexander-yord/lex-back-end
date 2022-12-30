@@ -183,13 +183,14 @@ def new():
 
     account_id = request.json.get("account_id")
     content = request.json.get("content")
+    status = 'P' if request.json.get("status") is None else request.json.get("status")
 
     stmt = "SELECT COUNT(account_id) FROM accounts WHERE account_id = %s"
     id_tuple = (account_id,)
     cursor.execute(stmt, id_tuple)
     if bool(cursor.fetchall()[0][0]):  # checks if this account_id exists
-        insert_stmt = "INSERT INTO lexes (content, account_id, status) VALUES (%s, %s, 'P')"
-        lex_values = (content, account_id)
+        insert_stmt = "INSERT INTO lexes (content, account_id, status) VALUES (%s, %s, %s)"
+        lex_values = (content, account_id, status)
         cursor.execute(insert_stmt, lex_values)
         cnx.commit()
 
