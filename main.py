@@ -13,6 +13,7 @@ initialization of the db connection and the Flask app
 signup endpoint
 uniqueness endpoint
 login endpoint
+new lex endpoint 
 """
 
 
@@ -47,7 +48,7 @@ def username_is_unique(username):
 
 # database connection
 cnx = None  # database connection variable
-cursor = None  # cursor variable
+cursor = cnx.cursor()  # cursor variable
 connect()  # connects to the database
 
 # Flask app
@@ -165,6 +166,40 @@ def login():
     else:
         # error_no 1 -- wrong username
         return make_response(jsonify({"success": False, "error_no": 1}))
+
+
+@app.route("/new", methods=["POST"])
+def new():
+    """Endpoint that expects the account id of a user and the content of a new lex and
+    adds it to the database. If successful, returns {success: True}. Otherwise, returns
+    {success: False, error_no: 1/2}, where
+    error_no = 1: could not save the record successfully
+    error_no = 2: account does not exist
+    """
+
+    try:  # tests the connection
+        _ = cnx.cursor()  # meaningless statement to test the connection
+    except sql.Error:  # if it is not working, it will reconnect
+        connect()
+
+    account_id = request.json.get("account_id")
+    content = request.json.get("content")
+
+    stmt = "SELECT COUNT(account_id) FROM accounts WHERE account_id = %s"
+    id_tuple = (account_id,)
+    cursor.execute(stmt, id_tuple)
+    if bool(cursor.fetchall()[0][0]):  # checks if this account_id exists
+        insert_stmt = "INSERT INTO lexes (content, account_id) VALUES (%s, %s)"
+        lex_values = (content, account_id)
+        cursor.execute(insert_stmt, lex_values)
+        cnx.commit()
+
+        if cursor.rowcount == 1:  # if a record was created, return true
+            return make_response(jsonify({"success": True}))
+        else:  # else, return false
+            return make_response(jsonify({"success": False, "error_no": 1}))
+    else:  # if the account id does not exist, return false
+        return make_response(jsonify({"success": False, "error_no": 2}))
 
 
 @app.route("/")
