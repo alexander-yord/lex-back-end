@@ -222,7 +222,7 @@ def all_lexes():
 
     index = 0 if request.json.get("index") is None else request.json.get("index")
     stmt = "SELECT l.uid, l.content, l.publish_dt, a.account_id, a.first_name, a.last_name, " \
-           "a.username FROM lexes l LEFT JOIN accounts a ON l.account_id = a.account_id" \
+           "a.username FROM lexes l LEFT JOIN accounts a ON l.account_id = a.account_id " \
            "WHERE l.status = 'P' " \
            "ORDER BY l.publish_dt DESC LIMIT %s"
 
