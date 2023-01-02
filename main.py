@@ -183,7 +183,7 @@ def new():
 
     account_id = request.json.get("account_id")
     content = request.json.get("content")
-    status = 'P' if request.json.get("status") is None else request.json.get("status")
+    status = "R" if request.json.get("status") is None else request.json.get("status")
 
     if status not in ("P", "R", "D"):  # verifies that the only possible values are P, R, D
         status = "R"
