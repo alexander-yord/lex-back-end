@@ -70,9 +70,9 @@ def signup():
         connect()
 
     # gets the values from the POST request
-    first_name = request.json.get("first_name")
-    last_name = request.json.get("last_name")
-    username = request.json.get("username")
+    first_name = request.json.get("first_name").title()
+    last_name = request.json.get("last_name").title()
+    username = request.json.get("username").lower()  # all usernames should be case insensitive
     password = request.json.get("password")
 
     # checks whether the username is unique
@@ -120,7 +120,7 @@ def uniqueness():
         _ = cnx.cursor()  # meaningless statement to test the connection
     except sql.Error:  # if it is not working, it will reconnect
         connect()
-    return make_response(jsonify({"unique": username_is_unique(request.json.get("username"))}))
+    return make_response(jsonify({"unique": username_is_unique(request.json.get("username").lower())}))
 
 
 @app.route("/login", methods=["POST"])
@@ -138,7 +138,7 @@ def login():
         connect()
 
     # gets the username and password
-    username = request.json.get("username")
+    username = request.json.get("username").lower()
     password = request.json.get("password")
 
     # checks if the username exists
