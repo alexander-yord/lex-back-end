@@ -15,6 +15,7 @@ uniqueness endpoint
 login endpoint
 new lex endpoint 
 all lexes endpoint
+account lexes endpoint
 new follower endpoint
 """
 
@@ -143,11 +144,11 @@ def login():
     password = request.json.get("password")
 
     # checks if the username exists
-    if not username_is_unique(username): # returns False if it exists
+    if not username_is_unique(username):  # returns False if it exists
         stmt = "SELECT a.account_id, a.username, a.first_name, a.last_name, l.password " \
                "FROM accounts a LEFT JOIN login_credentials l ON a.account_id = l.account_id " \
                "WHERE a.username = %s"
-        usrn_tuple = (username, )
+        usrn_tuple = (username,)
         cursor.execute(stmt, usrn_tuple)
         row = cursor.fetchall()[0]
 
@@ -227,9 +228,9 @@ def all_lexes():
            "WHERE l.status = 'P' " \
            "ORDER BY l.publish_dt DESC LIMIT %s"
 
-    cursor.execute(stmt, ((index+1)*10-1,))  # executes the stmt limited to (index+1)*10-1 results
+    cursor.execute(stmt, ((index + 1) * 10 - 1,))  # executes the stmt limited to (index+1)*10-1 results
     res = []
-    for row in cursor.fetchall()[(index*10):((index+1)*10-1)]:  # from index*10 to (index+1)*10-1
+    for row in cursor.fetchall()[(index * 10):((index + 1) * 10 - 1)]:  # from index*10 to (index+1)*10-1
         lex = {
             "uid": row[0],
             "content": row[1],
@@ -241,6 +242,46 @@ def all_lexes():
         }
         res.append(lex)
     return make_response(jsonify({"success": True, "result": res}))
+
+
+@app.route("/account_lexes", methods=["POST"])
+def account_lexes():
+    """Endpoint to return a list of lexes created by a certain account. Expects an account_id
+    and returns {"success": True, "result": [{uid, content, account_id, first_name, last_name,
+    username, publish_dt}, ...]}. If unsuccessful, returns {"success": False, "error_no": 1/2}
+    where error_no = 1: account does not exist"""
+
+    try:  # tests the connection
+        _ = cnx.cursor()  # meaningless statement to test the connection
+    except sql.Error:  # if it is not working, it will reconnect
+        connect()
+
+    account_id = request.json.get("account_id")
+    stmt = "SELECT COUNT(account_id) FROM accounts WHERE account_id = %s"
+    id_tuple = (account_id,)
+    cursor.execute(stmt, id_tuple)
+    if bool(cursor.fetchall()[0][0]):  # checks if this account_id exists
+        stmt = "SELECT l.uid, l.content, l.publish_dt, a.account_id, a.first_name, a.last_name, " \
+               "a.username FROM lexes l LEFT JOIN accounts a ON l.account_id = a.account_id " \
+               "WHERE l.status = 'P' AND l.account_id = %s " \
+               "ORDER BY l.publish_dt DESC LIMIT 75"
+        cursor.execute(stmt, id_tuple)
+
+        res = []
+        for row in cursor.fetchall():
+            lex = {
+                "uid": row[0],
+                "content": row[1],
+                "publish_dt": row[2],
+                "account_id": row[3],
+                "first_name": row[4],
+                "last_name": row[5],
+                "username": row[6]
+            }
+            res.append(lex)
+        return make_response(jsonify({"success": True, "result": res}))
+    else:  # if the account does not exist
+        return make_response(jsonify({"success": False, "error_no": 1}))
 
 
 @app.route("/new_follower", methods=["POST"])
@@ -288,4 +329,3 @@ def index():
 
 if __name__ == '__main__':
     app.run()
-
