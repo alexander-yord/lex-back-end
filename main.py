@@ -418,14 +418,20 @@ def new_follower():
         followed_account_id_tuple = (account_id,)
         cursor.execute(stmt, followed_account_id_tuple)
         if bool(cursor.fetchall()[0][0]):
-            stmt = "INSERT INTO followers (account_id, follower_id) VALUES (%s, %s)"
+            stmt = "SELECT COUNT(uid) FROM followers WHERE account_id = %s AND follower_id = %s"
             argument_tuple = (account_id, follower_id)
             cursor.execute(stmt, argument_tuple)
-            cnx.commit()
-            if cursor.rowcount == 1:  # if a record was created, return true
+            if bool(cursor.fetchall()[0][0]):  # checks if such record doesn't already exist
                 return make_response(jsonify({"success": True}))
-            else:  # if a record was not created, return false
-                return make_response(jsonify({"success": False, "error_no": 1}))
+            else:
+                stmt = "INSERT INTO followers (account_id, follower_id) VALUES (%s, %s)"
+                argument_tuple = (account_id, follower_id)
+                cursor.execute(stmt, argument_tuple)
+                cnx.commit()
+                if cursor.rowcount == 1:  # if a record was created, return true
+                    return make_response(jsonify({"success": True}))
+                else:  # if a record was not created, return false
+                    return make_response(jsonify({"success": False, "error_no": 1}))
         else:  # if the account of the user the current user is attempting to follow does not exist
             return make_response(jsonify({"success": False, "error_no": 3}))
     else:  # if the account of the current user does not exist
