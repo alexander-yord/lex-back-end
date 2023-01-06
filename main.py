@@ -284,7 +284,7 @@ def account_info():
             "account_id": row[0],
             "first_name": row[1],
             "last_name": row[2],
-            "username" row[3],
+            "username": row[3],
             "following": bool(row[4])
         }
 
