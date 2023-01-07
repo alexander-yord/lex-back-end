@@ -434,7 +434,7 @@ def new_follower():
 
     if action == "A":  # if the action is add
         if bool(number_of_records):  # checks if such record doesn't already exist
-            return make_response(jsonify({"success": True}))
+            return make_response(jsonify({"success": True, "action": "A"}))
         else:
             stmt = "INSERT INTO followers (account_id, follower_id) VALUES (%s, %s)"
             argument_tuple = (account_id, follower_id)
@@ -449,10 +449,10 @@ def new_follower():
         cursor.execute(stmt, (account_id, follower_id))
         cnx.commit()
         if cursor.rowcount == number_of_records:  # if all such records have been deleted
-            return make_response(jsonify({"success": True}))
+            return make_response(jsonify({"success": True, "action": "D"}))
         else:
-            return make_response(jsonify({"success": False}))
-    
+            return make_response(jsonify({"success": False, "action": "D"}))
+
 
 @app.route("/list_following", methods=["POST"])
 def list_follow():
