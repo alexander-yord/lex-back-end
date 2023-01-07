@@ -1,3 +1,5 @@
+from typing import Dict, Any
+
 from flask import Flask, request, jsonify, make_response
 import mysql.connector as sql
 import configparser
@@ -275,12 +277,13 @@ def account_info():
     else:
         # account_info
         stmt = "SELECT a.account_id, a.first_name, a.last_name, a.username, " \
-               "CASE WHEN (SELECT COUNT(account_id) FROM followers WHERE follower_id = %s)=1 " \
-               "THEN 1 ELSE 0 END AS current_following " \
-               "FROM accounts a WHERE a.account_id = %s"
+               "CASE WHEN (SELECT COUNT(s.uid) FROM followers s WHERE " \
+               "s.account_id=a.account_id AND s.follower_id = %s)>=1 " \
+               "THEN 1 ELSE 0 END AS current_following FROM accounts a " \
+               "WHERE a.account_id = %s"
         cursor.execute(stmt, (current_id, account_id))
         row = cursor.fetchall()[0]
-        account_info = {
+        account_information = {
             "account_id": row[0],
             "first_name": row[1],
             "last_name": row[2],
@@ -346,7 +349,7 @@ def account_info():
         # final return
         response = {
             "success": True,
-            "account_info": account_info,
+            "account_info": account_information,
             "lexes": lexes,
             "following": following,
             "followers": followers
@@ -396,12 +399,14 @@ def account_lexes():
 
 @app.route("/new_follower", methods=["POST"])
 def new_follower():
-    """Endpoint that expects an account_id and the id of the account that has been followed.
-    If the record has successfully been recorded, returns {"success": True}. Else,
-    {"success": False, "error_no": 1/2} where
+    """Endpoint that expects an account_id, the id of the account to be followed, and an action
+    -- A (add) or D (delete). For action = A (add), if the record has successfully been recorded,
+    returns {"success": True}. Else, {"success": False, "error_no": 1/2/3} where
     error_no = 1: could not save the record successfully
     error_no = 2: current user's account does not exist
-    error_no = 3: followed user's account does not exist"""
+    error_no = 3: followed user's account does not exist.
+    For action = D (delete), if the record was successfully deleted or if it didn't exist, returns
+    {"success": True}. """
 
     try:  # tests the connection
         _ = cnx.cursor()  # meaningless statement to test the connection
@@ -410,33 +415,44 @@ def new_follower():
 
     follower_id = request.json.get("account_id")
     account_id = request.json.get("followed_account_id")
+    action = "A" if request.json.get("action") is None else request.json.get("action")
+    if action not in ("A", "D"):  # verifies that the action is either Add or Delete
+        action = "A"
 
     stmt = "SELECT COUNT(account_id) FROM accounts WHERE account_id = %s"
-    current_id_tuple = (follower_id,)
-    cursor.execute(stmt, current_id_tuple)
-    if bool(cursor.fetchall()[0][0]):  # checks if this account_id exists
-        followed_account_id_tuple = (account_id,)
-        cursor.execute(stmt, followed_account_id_tuple)
-        if bool(cursor.fetchall()[0][0]):
-            stmt = "SELECT COUNT(uid) FROM followers WHERE account_id = %s AND follower_id = %s"
+    cursor.execute(stmt, (follower_id,))
+    if not bool(cursor.fetchall()[0][0]):
+        return make_response(jsonify({"success": False, "error_no": 2}))
+    cursor.execute(stmt, (account_id,))
+    if not bool(cursor.fetchall()[0][0]):
+        return make_response(jsonify({"success": False, "error_no": 3}))
+
+    stmt = "SELECT COUNT(uid) FROM followers WHERE account_id = %s AND follower_id = %s"
+    argument_tuple = (account_id, follower_id)
+    cursor.execute(stmt, argument_tuple)
+    number_of_records = cursor.fetchall()[0][0]
+
+    if action == "A":  # if the action is add
+        if bool(number_of_records):  # checks if such record doesn't already exist
+            return make_response(jsonify({"success": True}))
+        else:
+            stmt = "INSERT INTO followers (account_id, follower_id) VALUES (%s, %s)"
             argument_tuple = (account_id, follower_id)
             cursor.execute(stmt, argument_tuple)
-            if bool(cursor.fetchall()[0][0]):  # checks if such record doesn't already exist
+            cnx.commit()
+            if cursor.rowcount == 1:  # if a record was created, return true
                 return make_response(jsonify({"success": True}))
-            else:
-                stmt = "INSERT INTO followers (account_id, follower_id) VALUES (%s, %s)"
-                argument_tuple = (account_id, follower_id)
-                cursor.execute(stmt, argument_tuple)
-                cnx.commit()
-                if cursor.rowcount == 1:  # if a record was created, return true
-                    return make_response(jsonify({"success": True}))
-                else:  # if a record was not created, return false
-                    return make_response(jsonify({"success": False, "error_no": 1}))
-        else:  # if the account of the user the current user is attempting to follow does not exist
-            return make_response(jsonify({"success": False, "error_no": 3}))
-    else:  # if the account of the current user does not exist
-        return make_response(jsonify({"success": False, "error_no": 2}))
-
+            else:  # if a record was not created, return false
+                return make_response(jsonify({"success": False, "error_no": 1}))
+    else:  # if the action is delete
+        stmt = "DELETE FROM followers WHERE account_id = %s and follower_id = %s"
+        cursor.execute(stmt, (account_id, follower_id))
+        cnx.commit()
+        if cursor.rowcount == number_of_records:  # if all such records have been deleted
+            return make_response(jsonify({"success": True}))
+        else:
+            return make_response(jsonify({"success": False}))
+    
 
 @app.route("/list_following", methods=["POST"])
 def list_follow():
