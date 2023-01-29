@@ -230,9 +230,9 @@ def all_lexes():
            "WHERE l.status = 'P' " \
            "ORDER BY l.publish_dt DESC LIMIT %s"
 
-    cursor.execute(stmt, ((index + 1) * 10 - 1,))  # executes the stmt limited to (index+1)*10-1 results
+    cursor.execute(stmt, ((index + 1) * 20 - 1,))  # executes the stmt limited to (index+1)*10-1 results
     res = []
-    for row in cursor.fetchall()[(index * 10):((index + 1) * 10 - 1)]:  # from index*10 to (index+1)*10-1
+    for row in cursor.fetchall()[(index * 20):((index + 1) * 20 - 1)]:  # from index*10 to (index+1)*10-1
         lex = {
             "uid": row[0],
             "content": row[1],
