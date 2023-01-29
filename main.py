@@ -18,9 +18,7 @@ login endpoint
 new lex endpoint 
 all lexes endpoint
 account info endpoint
-account lexes endpoint
 new follower endpoint
-following endpoint
 """
 
 
@@ -256,7 +254,7 @@ def account_info():
      "lexes": [{lex}, {}...],
      "following": [{account_id, first_name, last_name, username, "following": True/False}],
      "followers": [{account_id, first_name, last_name, username, "following": True/False}]
-    }. If unsuccessful, return error_no = 2: account_id does not exist,
+    }. If unsuccessful, return error_no = 1: account_id does not exist,
     error_no = 2: current_id does not exist
     """
     try:  # tests the connection
@@ -357,46 +355,6 @@ def account_info():
         return make_response(jsonify(response))
 
 
-@app.route("/account_lexes", methods=["POST"])
-def account_lexes():
-    """Endpoint to return a list of lexes created by a certain account. Expects an account_id
-    and returns {"success": True, "result": [{uid, content, account_id, first_name, last_name,
-    username, publish_dt}, ...]}. If unsuccessful, returns {"success": False, "error_no": 1/2}
-    where error_no = 1: account does not exist"""
-
-    try:  # tests the connection
-        _ = cnx.cursor()  # meaningless statement to test the connection
-    except sql.Error:  # if it is not working, it will reconnect
-        connect()
-
-    account_id = request.json.get("account_id")
-    stmt = "SELECT COUNT(account_id) FROM accounts WHERE account_id = %s"
-    id_tuple = (account_id,)
-    cursor.execute(stmt, id_tuple)
-    if bool(cursor.fetchall()[0][0]):  # checks if this account_id exists
-        stmt = "SELECT l.uid, l.content, l.publish_dt, a.account_id, a.first_name, a.last_name, " \
-               "a.username FROM lexes l LEFT JOIN accounts a ON l.account_id = a.account_id " \
-               "WHERE l.status = 'P' AND l.account_id = %s " \
-               "ORDER BY l.publish_dt DESC LIMIT 75"
-        cursor.execute(stmt, id_tuple)
-
-        res = []
-        for row in cursor.fetchall():
-            lex = {
-                "uid": row[0],
-                "content": row[1],
-                "publish_dt": row[2],
-                "account_id": row[3],
-                "first_name": row[4],
-                "last_name": row[5],
-                "username": row[6]
-            }
-            res.append(lex)
-        return make_response(jsonify({"success": True, "result": res}))
-    else:  # if the account does not exist
-        return make_response(jsonify({"success": False, "error_no": 1}))
-
-
 @app.route("/new_follower", methods=["POST"])
 def new_follower():
     """Endpoint that expects an account_id, the id of the account to be followed, and an action
@@ -452,55 +410,6 @@ def new_follower():
             return make_response(jsonify({"success": True, "action": "D"}))
         else:
             return make_response(jsonify({"success": False, "action": "D"}))
-
-
-@app.route("/list_following", methods=["POST"])
-def list_follow():
-    """Endpoint that expects an account id and returns a list of all accounts this account follows.
-    Also expects the current user's account id and checks if they follow each one of them.
-    If successful, {"success": True, [{"account_id", "first_name", "last_name", "username",
-    "following": T/F}]}. Else, returns {"success": False, "error_no": 1/2} where
-    error_no = 1: account does not exist
-    error_no = 2: current account does not exist
-    """
-
-    try:  # tests the connection
-        _ = cnx.cursor()  # meaningless statement to test the connection
-    except sql.Error:  # if it is not working, it will reconnect
-        connect()
-
-    account_id = request.json.get("account_id")
-    current_id = request.json.get("current_id")
-
-    stmt = "SELECT COUNT(account_id) FROM accounts WHERE account_id = %s"
-    account_id_tuple = (account_id,)
-    cursor.execute(stmt, account_id_tuple)
-    if bool(cursor.fetchall()[0][0]):  # checks if this account_id exists
-        current_id_tuple = (current_id,)
-        cursor.execute(stmt, current_id_tuple)
-        if bool(cursor.fetchall()[0][0]):  # checks if this current account's id exists
-            stmt = "SELECT f.account_id, a.username, a.first_name, a.last_name, " \
-                   "CASE WHEN (SELECT COUNT(account_id) FROM followers WHERE follower_id = %s)=1 " \
-                   "THEN 1 ELSE 0 END AS current_following " \
-                   "FROM followers f " \
-                   "LEFT JOIN accounts a ON f.account_id = a.account_id " \
-                   "WHERE f.follower_id = %s"
-            cursor.execute(stmt, (current_id, account_id))
-            res = []
-            for row in cursor.fetchall():
-                account = {
-                    "account_id": row[0],
-                    "username": row[1],
-                    "first_name": row[2],
-                    "last_name": row[3],
-                    "current_following": bool(row[4])
-                }
-                res.append(account)
-            return make_response(jsonify({"success": True, "result": res}))
-        else:
-            return make_response(jsonify({"success": False, "error_no": 2}))
-    else:
-        return make_response(jsonify({"success": False, "error_no": 1}))
 
 
 @app.route("/")
