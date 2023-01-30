@@ -43,6 +43,13 @@ def connect():
     cursor = cnx.cursor()
 
 
+def verify_connection():  # reconnnects to the database if the connection has been lost
+    try:  # tests the connection
+        _ = cnx.cursor()  # meaningless statement to test the connection
+    except sql.Error:  # if it is not working, it will reconnect
+        connect()
+
+
 def username_is_unique(username):
     stmt = "SELECT count(account_id) FROM accounts WHERE username = %s"
     usr_tuple = (username,)
@@ -68,10 +75,7 @@ def signup():
     logged in.
     If not, returns {success = False}
     """
-    try:  # tests the connection
-        _ = cnx.cursor()  # meaningless statement to test the connection
-    except sql.Error:  # if it is not working, it will reconnect
-        connect()
+    verify_connection()  # reconnects to the DB if the connection has been lost
 
     # gets the values from the POST request
     first_name = request.json.get("first_name").title()
@@ -120,10 +124,7 @@ def signup():
 def uniqueness():
     """Endpoint that checks whether the username is unique
     """
-    try:  # tests the connection
-        _ = cnx.cursor()  # meaningless statement to test the connection
-    except sql.Error:  # if it is not working, it will reconnect
-        connect()
+    verify_connection()  # reconnects to the DB if the connection has been lost
     return make_response(jsonify({"unique": username_is_unique(request.json.get("username").lower())}))
 
 
@@ -136,10 +137,7 @@ def login():
     error_no = 2: password is incorrect
     """
 
-    try:  # tests the connection
-        _ = cnx.cursor()  # meaningless statement to test the connection
-    except sql.Error:  # if it is not working, it will reconnect
-        connect()
+    verify_connection()  # reconnects to the DB if the connection has been lost
 
     # gets the username and password
     username = request.json.get("username").lower()
@@ -181,10 +179,7 @@ def new():
     error_no = 2: account does not exist
     """
 
-    try:  # tests the connection
-        _ = cnx.cursor()  # meaningless statement to test the connection
-    except sql.Error:  # if it is not working, it will reconnect
-        connect()
+    verify_connection()  # reconnects to the DB if the connection has been lost
 
     account_id = request.json.get("account_id")
     content = request.json.get("content")
@@ -219,10 +214,7 @@ def all_lexes():
     first_name, last_name, username, publish_dt}]
     """
 
-    try:  # tests the connection
-        _ = cnx.cursor()  # meaningless statement to test the connection
-    except sql.Error:  # if it is not working, it will reconnect
-        connect()
+    verify_connection()  # reconnects to the DB if the connection has been lost
 
     index = 0 if request.json.get("index") is None else request.json.get("index")
     stmt = "SELECT l.uid, l.content, l.publish_dt, a.account_id, a.first_name, a.last_name, " \
@@ -257,16 +249,13 @@ def account_info():
     }. If unsuccessful, return error_no = 1: account_id does not exist,
     error_no = 2: current_id does not exist
     """
-    try:  # tests the connection
-        _ = cnx.cursor()  # meaningless statement to test the connection
-    except sql.Error:  # if it is not working, it will reconnect
-        connect()
+    verify_connection()  # reconnects to the DB if the connection has been lost
 
     account_id = request.json.get("account_id")
     current_id = request.json.get("current_id")
 
     stmt = "SELECT COUNT(account_id) FROM accounts WHERE account_id = %s"
-    cursor.execute(stmt, (account_id, ))
+    cursor.execute(stmt, (account_id,))
     if not bool(cursor.fetchall()[0][0]):  # if the account does not exist
         return make_response(jsonify({"success": False, "error_no": 1}))
     cursor.execute(stmt, (current_id,))
@@ -366,10 +355,7 @@ def new_follower():
     For action = D (delete), if the record was successfully deleted or if it didn't exist, returns
     {"success": True}. """
 
-    try:  # tests the connection
-        _ = cnx.cursor()  # meaningless statement to test the connection
-    except sql.Error:  # if it is not working, it will reconnect
-        connect()
+    verify_connection()  # reconnects to the DB if the connection has been lost
 
     follower_id = request.json.get("account_id")
     account_id = request.json.get("followed_account_id")
