@@ -1,5 +1,3 @@
-from typing import Dict, Any
-
 from flask import Flask, request, jsonify, make_response
 import mysql.connector as sql
 import configparser
