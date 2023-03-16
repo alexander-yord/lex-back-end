@@ -11,6 +11,7 @@ definition of connect()
 definition of verify_connection()
 definition of generate_authorization()
 definition of verify_authorization()
+definition of account_exists()
 definition of username_is_unique()
 
 initialization of the db connection and the Flask app
@@ -22,6 +23,8 @@ new lex endpoint
 all lexes endpoint
 account info endpoint
 new follower endpoint
+my account endpoint 
+update my account endpoint
 """
 
 
@@ -64,6 +67,12 @@ def verify_authorization(account_id, token):  # verifies that the token passed i
     cursor.execute(stmt, acc_tuple)
     real_token = cursor.fetchone()[0]
     return True if token == real_token or token == "postmanTest" else False
+
+
+def account_exists(account_id):
+    stmt = "SELECT COUNT(account_id) FROM accounts WHERE account_id = %s"
+    cursor.execute(stmt, (account_id,))
+    return bool(cursor.fetchall()[0][0])
 
 
 def username_is_unique(username):  # checks whether a username exists in the DB
@@ -416,6 +425,89 @@ def new_follower():
             return make_response(jsonify({"success": True, "action": "D"}))
         else:
             return make_response(jsonify({"success": False, "action": "D"}))
+
+
+@app.route("/my-account", methods=["POST"])
+def my_account():
+    """An endpoint that expects an account_id and an authorization token and returns information about the user's
+    account. Format:
+    { account_id, first_name, last_name, username, birthday_date, email_address, status, password }
+    If something is not right, returns {"success": False, "error_no": 1/2} where
+    error_no = 1: account does not exist
+    error_no = 2: authorization token is incorrect
+    """
+    verify_connection()
+
+    account_id = request.json.get("account_id")
+    token = request.json.get("authorization")
+
+    if not account_exists(account_id):
+        return make_response(jsonify({"success": False, "error_no": 1}), 200)
+    if not verify_authorization(account_id, token):
+        return make_response(jsonify({"success": False, "error_no": 2}), 200)
+
+    # if account exists and is authorized
+    stmt = "SELECT a.first_name, a.last_name, a.username, a.birthday_date, a.email_address, a.status, l.password " \
+           "FROM accounts a JOIN login_credentials l ON a.account_id=l.account_id " \
+           "WHERE a.account_id = %s"
+    cursor.execute(stmt, (account_id,))
+    row = cursor.fetchone()
+
+    result = {
+        "success": True,
+        "account_id": account_id,
+        "first_name": row[0],
+        "last_name": row[1],
+        "username": row[2],
+        "birthdate": row[3],
+        "email": row[4],
+        "status": row[5],
+        "password": row[6]
+    }
+    return make_response(jsonify(result), 200)
+
+
+@app.route("/update-account", methods=["POST"])
+def update_account():
+    """Endpoint that expect { account_id, authorization, old_username, username, first_name, last_name, birthday_date,
+    email_address, password }. If something is not right, returns {"success": False, "error_no": 1/2/3} where
+    error_no = 1: account does not exist
+    error_no = 2: authorization token is incorrect
+    error_no = 3: new username is not unique
+    """
+    verify_connection()
+
+    # obtaining each of the variables from the JSON request
+    account_id = request.json.get('account_id')
+    token = request.json.get('authorization')
+    first_name = request.json.get('first_name').title()
+    last_name = request.json.get('last_name').title()
+    old_username = request.json.get('old_username')
+    username = request.json.get('username')
+    birthday_date = request.json.get('birthday_date')
+    email_address = request.json.get('email_address')
+    password = request.json.get('password')
+
+    if not account_exists(account_id):
+        return make_response(jsonify({"success": False, "error_no": 1}), 200)
+    if not verify_authorization(account_id, token):
+        return make_response(jsonify({"success": False, "error_no": 2}), 200)
+    if old_username != username and not username_is_unique(username):
+        return make_response(jsonify({"success": False, "error_no": 3}), 200)
+
+    # else
+    stmt_account = "UPDATE accounts " \
+                   "SET username = %s, first_name = %s, last_name = %s, birthday_date = %s, email_address = %s " \
+                   "WHERE account_id = %s"
+    bind = (username, first_name, last_name, birthday_date, email_address, account_id)
+    cursor.execute(stmt_account, bind)
+    cnx.commit()
+
+    stmt_pass = "UPDATE login_credentials SET password = %s WHERE account_id = %s"
+    cursor.execute(stmt_pass, (password, account_id))
+    cnx.commit()
+
+    return make_response(jsonify({"success": True}), 200)
 
 
 @app.route("/")
