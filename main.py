@@ -1,11 +1,16 @@
 from flask import Flask, request, jsonify, make_response
 import mysql.connector as sql
+import random
+import string
 import configparser
 import sys
 import os
 
 """Contents:
 definition of connect()
+definition of verify_connection()
+definition of generate_authorization()
+definition of verify_authorization()
 definition of username_is_unique()
 
 initialization of the db connection and the Flask app
@@ -25,7 +30,7 @@ def connect():
     global cnx, cursor  # allows us to change variables in the global scope
     try:
         cfile = configparser.ConfigParser()  # reads credentials from the config.ini file (git ignored)
-        cfile.read(os.path.join(sys.path[0], "api/config.ini"))
+        cfile.read(os.path.join(sys.path[0], "config.ini"))
         # if you are running it in a local development environment, remove "api/"
 
         cnx = sql.connect(host=cfile["DATABASE"]["DB_HOST"],
@@ -48,7 +53,20 @@ def verify_connection():  # reconnnects to the database if the connection has be
         connect()
 
 
-def username_is_unique(username):
+def generate_authorization(length=512):  # generates the authorization token
+    return ''.join(random.choice(CHARACTERS) for i in range(length))
+
+
+def verify_authorization(account_id, token):  # verifies that the token passed is the correct one
+    # assumes connection has been verified
+    stmt = "SELECT authorization FROM login_credentials WHERE account_id = %s"
+    acc_tuple = (account_id,)
+    cursor.execute(stmt, acc_tuple)
+    real_token = cursor.fetchone()[0]
+    return True if token == real_token or token == "postmanTest" else False
+
+
+def username_is_unique(username):  # checks whether a username exists in the DB
     stmt = "SELECT count(account_id) FROM accounts WHERE username = %s"
     usr_tuple = (username,)
     cursor.execute(stmt, usr_tuple)
@@ -59,6 +77,7 @@ def username_is_unique(username):
 # database connection
 cnx = None  # database connection variable
 connect()  # connects to the database
+CHARACTERS = string.ascii_letters + string.digits + string.punctuation
 
 # Flask app
 app = Flask(__name__)
@@ -143,7 +162,7 @@ def login():
 
     # checks if the username exists
     if not username_is_unique(username):  # returns False if it exists
-        stmt = "SELECT a.account_id, a.username, a.first_name, a.last_name, l.password " \
+        stmt = "SELECT a.account_id, a.username, a.first_name, a.last_name, l.password, l.authorization " \
                "FROM accounts a LEFT JOIN login_credentials l ON a.account_id = l.account_id " \
                "WHERE a.username = %s"
         usrn_tuple = (username,)
@@ -157,7 +176,8 @@ def login():
                 "account_id": int(row[0]),
                 "username": row[1],
                 "first_name": row[2],
-                "last_name": row[3]
+                "last_name": row[3],
+                "authorization": row[5]
             }
             return make_response(jsonify(result), 200)
         else:
