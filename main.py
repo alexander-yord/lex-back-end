@@ -118,9 +118,10 @@ def signup():
         row = cursor.fetchall()[0]
 
         # prepares and executes the sql stmt for the login_credentials table
-        stmt = "INSERT INTO login_credentials (account_id, password) " \
-               "VALUES ((SELECT account_id FROM accounts WHERE username = %s), %s)"
-        login_values = (row[1], password)
+        stmt = "INSERT INTO login_credentials (account_id, password, authorization) " \
+               "VALUES ((SELECT account_id FROM accounts WHERE username = %s), %s, %s)"
+        authorization_token = generate_authorization()
+        login_values = (row[1], password, authorization_token)
         cursor.execute(stmt, login_values)
         cnx.commit()
 
@@ -130,7 +131,8 @@ def signup():
             "account_id": int(row[0]),
             "username": row[1],
             "first_name": row[2],
-            "last_name": row[3]
+            "last_name": row[3],
+            "authorization": authorization_token
         }
         return make_response(jsonify(result), 200)
     else:
