@@ -467,7 +467,7 @@ def my_account():
     return make_response(jsonify(result), 200)
 
 
-@app.route("/update-account", methods=["POST"])
+@app.route("/update-account", methods=["PUT"])
 def update_account():
     """Endpoint that expect { account_id, authorization, old_username, username, first_name, last_name, birthday_date,
     email_address, password }. If something is not right, returns {"success": False, "error_no": 1/2/3} where
