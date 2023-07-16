@@ -33,7 +33,7 @@ def connect():
     global cnx, cursor  # allows us to change variables in the global scope
     try:
         cfile = configparser.ConfigParser()  # reads credentials from the config.ini file (git ignored)
-        cfile.read(os.path.join(sys.path[0], "config.ini"))
+        cfile.read(os.path.join(sys.path[0], "api/config.ini"))
         # if you are running it in a local development environment, remove "api/"
 
         cnx = sql.connect(host=cfile["DATABASE"]["DB_HOST"],
