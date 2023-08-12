@@ -1,3 +1,4 @@
+from connections import verify_connection, cnx, cursor
 import random
 import string
 
