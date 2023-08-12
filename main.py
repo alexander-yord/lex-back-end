@@ -1,10 +1,7 @@
 from flask import Flask, request, jsonify, make_response
-import mysql.connector as sql
-import random
-import string
-import configparser
-import sys
-import os
+from connections import cursor, verify_connection
+from accounts import account_info
+from helpers import generate_authorization, verify_authorization, account_exists, username_is_unique
 
 """Contents:
 definition of connect()
@@ -28,68 +25,12 @@ update my account endpoint
 """
 
 
-# function to connect to the database
-def connect():
-    global cnx, cursor  # allows us to change variables in the global scope
-    try:
-        cfile = configparser.ConfigParser()  # reads credentials from the config.ini file (git ignored)
-        cfile.read(os.path.join(sys.path[0], "api/config.ini"))
-        # if you are running it in a local development environment, remove "api/"
-
-        cnx = sql.connect(host=cfile["DATABASE"]["DB_HOST"],
-                          user=cfile["DATABASE"]["DB_USER"],
-                          password=cfile["DATABASE"]["DB_PASS"],
-                          database=cfile["DATABASE"]["DB_NAME"])
-    except sql.Error as err:
-        if err.errno == sql.errorcode.ER_ACCESS_DENIED_ERROR:
-            print("User authorization error")
-        elif err.errno == sql.errorcode.ER_BAD_DB_ERROR:
-            print("Database doesn't exist")
-        raise err
-    cursor = cnx.cursor()
-
-
-def verify_connection():  # reconnnects to the database if the connection has been lost
-    try:  # tests the connection
-        _ = cnx.cursor()  # meaningless statement to test the connection
-    except sql.Error:  # if it is not working, it will reconnect
-        connect()
-
-
-def generate_authorization(length=512):  # generates the authorization token
-    return ''.join(random.choice(CHARACTERS) for i in range(length))
-
-
-def verify_authorization(account_id, token):  # verifies that the token passed is the correct one
-    # assumes connection has been verified
-    stmt = "SELECT authorization FROM login_credentials WHERE account_id = %s"
-    acc_tuple = (account_id,)
-    cursor.execute(stmt, acc_tuple)
-    real_token = cursor.fetchone()[0]
-    return True if token == real_token or token == "postmanTest" else False
-
-
-def account_exists(account_id):
-    stmt = "SELECT COUNT(account_id) FROM accounts WHERE account_id = %s"
-    cursor.execute(stmt, (account_id,))
-    return bool(cursor.fetchall()[0][0])
-
-
-def username_is_unique(username):  # checks whether a username exists in the DB
-    stmt = "SELECT count(account_id) FROM accounts WHERE username = %s"
-    usr_tuple = (username,)
-    cursor.execute(stmt, usr_tuple)
-    count = cursor.fetchall()[0][0]  # gets the count
-    return True if count == 0 else False
-
-
 # database connection
-cnx = None  # database connection variable
-connect()  # connects to the database
-CHARACTERS = string.ascii_letters + string.digits + string.punctuation
-
+# cnx = None  # database connection variable
+# connect()  # connects to the database
 # Flask app
 app = Flask(__name__)
+app.add_url_rule("/account_info", view_func=account_info, methods=["POST"])
 
 
 @app.route("/signup", methods=["POST"])
@@ -265,112 +206,6 @@ def all_lexes():
         }
         res.append(lex)
     return make_response(jsonify({"success": True, "result": res}))
-
-
-@app.route("/account_info", methods=["POST"])
-def account_info():
-    """An endpoint that returns account information. Expects an account_id and a current_id. Returns
-    {"success": True,
-     "account_info": {account_id, first_name, last_name, username, "following": True/False},
-     "lexes": [{lex}, {}...],
-     "following": [{account_id, first_name, last_name, username, "following": True/False}],
-     "followers": [{account_id, first_name, last_name, username, "following": True/False}]
-    }. If unsuccessful, return error_no = 1: account_id does not exist,
-    error_no = 2: current_id does not exist
-    """
-    verify_connection()  # reconnects to the DB if the connection has been lost
-
-    account_id = request.json.get("account_id")
-    current_id = request.json.get("current_id")
-
-    stmt = "SELECT COUNT(account_id) FROM accounts WHERE account_id = %s"
-    cursor.execute(stmt, (account_id,))
-    if not bool(cursor.fetchall()[0][0]):  # if the account does not exist
-        return make_response(jsonify({"success": False, "error_no": 1}))
-    cursor.execute(stmt, (current_id,))
-    if not bool(cursor.fetchall()[0][0]):  # if the current account does not exist
-        return make_response(jsonify({"success": False, "error_no": 2}))
-    else:
-        # account_info
-        stmt = "SELECT a.account_id, a.first_name, a.last_name, a.username, " \
-               "CASE WHEN (SELECT COUNT(s.uid) FROM followers s WHERE " \
-               "s.account_id=a.account_id AND s.follower_id = %s)>=1 " \
-               "THEN 1 ELSE 0 END AS current_following FROM accounts a " \
-               "WHERE a.account_id = %s"
-        cursor.execute(stmt, (current_id, account_id))
-        row = cursor.fetchall()[0]
-        account_information = {
-            "account_id": row[0],
-            "first_name": row[1],
-            "last_name": row[2],
-            "username": row[3],
-            "following": bool(row[4])
-        }
-
-        # lexes
-        stmt = "SELECT l.uid, l.content, l.publish_dt, a.account_id, a.first_name, a.last_name, " \
-               "a.username FROM lexes l LEFT JOIN accounts a ON l.account_id = a.account_id " \
-               "WHERE l.status = 'P' AND l.account_id = %s " \
-               "ORDER BY l.publish_dt DESC LIMIT 75"
-        cursor.execute(stmt, (account_id,))
-        lexes = []
-        for row in cursor.fetchall():
-            lex = {
-                "uid": row[0],
-                "content": row[1],
-                "publish_dt": row[2],
-                "account_id": row[3],
-                "first_name": row[4],
-                "last_name": row[5],
-                "username": row[6]
-            }
-            lexes.append(lex)
-
-        # following
-        stmt = "SELECT f.account_id, a.first_name, a.last_name, a.username, " \
-               "CASE WHEN (SELECT COUNT(s.uid) FROM followers s WHERE s.account_id = f.account_id " \
-               "AND s.follower_id  = %s)>=1 THEN 1 ELSE 0 END AS current_following " \
-               "FROM followers f LEFT JOIN accounts a ON f.account_id = a.account_id " \
-               "WHERE f.follower_id = %s"
-        cursor.execute(stmt, (current_id, account_id))
-        following = []
-        for row in cursor.fetchall():
-            account = {
-                "account_id": row[0],
-                "first_name": row[1],
-                "last_name": row[2],
-                "username": row[3],
-                "current_following": bool(row[4])
-            }
-            following.append(account)
-
-        # followers
-        stmt = "SELECT f.follower_id, a.first_name, a.last_name, a.username, " \
-               "CASE WHEN (SELECT COUNT(s.uid) FROM followers s WHERE s.account_id=f.follower_id " \
-               "AND s.follower_id = %s)>=1 THEN 1 ELSE 0 END AS current_following " \
-               "FROM followers f LEFT JOIN accounts a ON f.follower_id=a.account_id " \
-               "WHERE f.account_id = %s"
-        cursor.execute(stmt, (current_id, account_id))
-        followers = []
-        for row in cursor.fetchall():
-            account = {
-                "account_id": row[0],
-                "first_name": row[1],
-                "last_name": row[2],
-                "username": row[3],
-                "current_following": bool(row[4])
-            }
-            followers.append(account)
-
-        # final return
-        response = {
-            "success": True,
-            "account_info": account_information,
-            "lexes": lexes,
-            "following": following,
-            "followers": followers
-        }
-        return make_response(jsonify(response))
 
 
 @app.route("/new_follower", methods=["POST"])
