@@ -80,7 +80,7 @@ def account_info():
     account_id = request.json.get("account_id")
     current_id = request.json.get("current_id")
 
-    stmt = "SELECT COUNT(account_id) FROM account WHERE account_id = %s"
+    stmt = "SELECT COUNT(account_id) FROM accounts WHERE account_id = %s"
     cursor.execute(stmt, (account_id,))
     if not bool(cursor.fetchall()[0][0]):  # if the account does not exist
         return make_response(jsonify({"success": False, "error_no": 1}))
@@ -92,7 +92,7 @@ def account_info():
         stmt = "SELECT a.account_id, a.first_name, a.last_name, a.username, " \
                "CASE WHEN (SELECT COUNT(s.uid) FROM followers s WHERE " \
                "s.account_id=a.account_id AND s.follower_id = %s)>=1 " \
-               "THEN 1 ELSE 0 END AS current_following FROM account a " \
+               "THEN 1 ELSE 0 END AS current_following FROM accounts a " \
                "WHERE a.account_id = %s"
         cursor.execute(stmt, (current_id, account_id))
         row = cursor.fetchall()[0]
@@ -106,7 +106,7 @@ def account_info():
 
         # lexes
         stmt = "SELECT l.uid, l.content, l.publish_dt, a.account_id, a.first_name, a.last_name, " \
-               "a.username FROM lexes l LEFT JOIN account a ON l.account_id = a.account_id " \
+               "a.username FROM lexes l LEFT JOIN accounts a ON l.account_id = a.account_id " \
                "WHERE l.status = 'P' AND l.account_id = %s " \
                "ORDER BY l.publish_dt DESC LIMIT 75"
         cursor.execute(stmt, (account_id,))
@@ -127,7 +127,7 @@ def account_info():
         stmt = "SELECT f.account_id, a.first_name, a.last_name, a.username, " \
                "CASE WHEN (SELECT COUNT(s.uid) FROM followers s WHERE s.account_id = f.account_id " \
                "AND s.follower_id  = %s)>=1 THEN 1 ELSE 0 END AS current_following " \
-               "FROM followers f LEFT JOIN account a ON f.account_id = a.account_id " \
+               "FROM followers f LEFT JOIN accounts a ON f.account_id = a.account_id " \
                "WHERE f.follower_id = %s"
         cursor.execute(stmt, (current_id, account_id))
         following = []
@@ -145,7 +145,7 @@ def account_info():
         stmt = "SELECT f.follower_id, a.first_name, a.last_name, a.username, " \
                "CASE WHEN (SELECT COUNT(s.uid) FROM followers s WHERE s.account_id=f.follower_id " \
                "AND s.follower_id = %s)>=1 THEN 1 ELSE 0 END AS current_following " \
-               "FROM followers f LEFT JOIN account a ON f.follower_id=a.account_id " \
+               "FROM followers f LEFT JOIN accounts a ON f.follower_id=a.account_id " \
                "WHERE f.account_id = %s"
         cursor.execute(stmt, (current_id, account_id))
         followers = []
@@ -187,7 +187,7 @@ def login():
     # checks if the username exists
     if not username_is_unique(username):  # returns False if it exists
         stmt = "SELECT a.account_id, a.username, a.first_name, a.last_name, l.password, l.authorization " \
-               "FROM account a LEFT JOIN login_credentials l ON a.account_id = l.account_id " \
+               "FROM accounts a LEFT JOIN login_credentials l ON a.account_id = l.account_id " \
                "WHERE a.username = %s"
         usrn_tuple = (username,)
         cursor.execute(stmt, usrn_tuple)
@@ -232,7 +232,7 @@ def my_account():
 
     # if account exists and is authorized
     stmt = "SELECT a.first_name, a.last_name, a.username, a.birthday_date, a.email_address, a.status, l.password " \
-           "FROM account a JOIN login_credentials l ON a.account_id=l.account_id " \
+           "FROM accounts a JOIN login_credentials l ON a.account_id=l.account_id " \
            "WHERE a.account_id = %s"
     cursor.execute(stmt, (account_id,))
     row = cursor.fetchone()
@@ -279,7 +279,7 @@ def update_account():
         return make_response(jsonify({"success": False, "error_no": 3}), 200)
 
     # else
-    stmt_account = "UPDATE account " \
+    stmt_account = "UPDATE accounts " \
                    "SET username = %s, first_name = %s, last_name = %s, birthday_date = %s, email_address = %s " \
                    "WHERE account_id = %s"
     bind = (username, first_name, last_name, birthday_date, email_address, account_id)

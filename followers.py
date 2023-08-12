@@ -21,7 +21,7 @@ def new_follower():
     if action not in ("A", "D"):  # verifies that the action is either Add or Delete
         action = "A"
 
-    stmt = "SELECT COUNT(account_id) FROM account WHERE account_id = %s"
+    stmt = "SELECT COUNT(account_id) FROM accounts WHERE account_id = %s"
     cursor.execute(stmt, (follower_id,))
     if not bool(cursor.fetchall()[0][0]):
         return make_response(jsonify({"success": False, "error_no": 2}))
