@@ -170,7 +170,7 @@ def account_info():
         return make_response(jsonify(response))
 
 
-def login():
+def login1():
     """Endpoint that checks login credentials and if login is successful, returns
     {success = True, account_id, first_name, last_name, username}.
     If not, {success = False, error_no} where
