@@ -25,9 +25,9 @@ app.add_url_rule("/all_lexes", view_func=all_lexes, methods=["POST"])
 app.add_url_rule("/new_follower", view_func=new_follower, methods=["POST"])
 
 # VERSION 2
-app.add_url_rule("/v2/account", view_func=account, methods=["POST", "GET"])
-app.add_url_rule("/v2/unique", view_func=unique, methods=["GET"])
-app.add_url_rule("/v2/login", view_func=login, methods=["POST"])
+app.add_url_rule("/account", view_func=account, methods=["POST", "GET"])
+app.add_url_rule("/unique", view_func=unique, methods=["GET"])
+app.add_url_rule("/login2", view_func=login, methods=["POST"])
 
 
 @app.route("/")
